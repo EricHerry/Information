@@ -1,0 +1,282 @@
+---
+title: 'Some Simulated Functions'
+author: "Eric Herrison Gyamfi"
+date: "9/10/2020"
+output:
+  pdf_document: default
+  word_document: default
+---
+# Question 1
+
+```{r, warning=FALSE, message=FALSE}
+library(tidyverse)
+n<-50 # sample size
+output.sample <- numeric() # the results should be numeric
+inverse_cdf<-function(x) {      #define the target density
+  qbeta(x, 15, 9)
+}
+
+# the function contains the target density and sample size 
+r.sample.cdf <- function(inverse_cdf, n) {        
+   for (i in 1:n) { 
+     u <- runif(1,0,1)                   # step I
+     output.sample[i] <- inverse_cdf(u)   # step II
+  }
+   return(output.sample) #return the final output
+
+}
+
+#test th function
+#dimension of the vector is the same as the sample size.
+r.sample.cdf(qbeta(n, 15, 11), 10) 
+length(r.sample.cdf(qbeta(n, 15, 11), 10))
+
+#we draw a histogram with the sample generated to check the shape
+r.sample.cdf(qbeta(n, 15, 9), 10000) %>% hist() 
+
+```
+
+# Question 2
+
+```{r}
+# we define the domain of the function
+lower<-0
+upper<-1
+b<-2 #sample size
+
+# the function contains the target density, domain and sample size
+
+f<-function(x){
+  dbeta(x, 15, 12)
+  }
+r.sample_accept<- function(f, lower, upper, b){
+    accept <- numeric()
+    m <- max(f(seq(lower, upper, length.out=20000))) #step I
+    i <- 1
+  while (length(accept)< b) {
+    
+    x<- runif(1,lower,upper) #step II
+    y <- runif(1,lower,m)  #step III
+  if (y < f(x)) 
+  {accept[i]<-x  #step IV
+  
+       i <- i+1  
+       }
+    }   
+      return(accept) # final output
+}
+ 
+#test the function
+#dimension of the vector is the same as the sample size.
+r.sample_accept(dexp(b, 5), 0, 5, 10)
+length(r.sample_accept(dexp(b, 5), 0, 5, 10))
+
+#we draw a histogram with the sample generated to check the shape
+r.sample_accept(dbeta(b, 11, 7), 0 , 1, 1000) %>% hist()
+
+```
+
+
+# Quuestion 3
+
+```{r}
+xo <- runif(1, -10, 10) #initial randow draw
+n.steps<-10000 #number of steps
+proposed.f<-function(x){
+  x + runif(1, -6, 6)         #proposed function
+}
+target.pdf<-function(x){
+  dnorm(x, 10, 2)           #target function
+  }
+metropolis.sample.mcmc<-function(target.pdf,proposed.f,xo,n.steps){
+  x <- numeric()
+   x[1] <- xo   # step I
+  for(i in 2:n.steps){
+    s <- x[i-1]  # step II
+    s.prop <- proposed.f(s)   # step III
+    G <- target.pdf(s.prop)/target.pdf(s) # step Iv
+    if(runif(1) < G ){
+      x[i] <- s.prop       # step V
+    } else {
+      x[i] <- s       
+    }
+  }
+  return(x) #final output
+}
+
+#test test function
+sample.mcmc<-metropolis.sample.mcmc(target.pdf,proposed.f,xo,n.steps)
+sample.mcmc %>% hist()
+
+
+
+
+```
+
+
+
+# Question 4.
+
+```{r}
+Multiple.MCMC <- data.frame() #convert the matrix or the data to dataframe
+Gelman.Diagnostics <- function(Multiple.MCMC){ # the function contains a multiple sample
+  Final.Output<-numeric()
+  n<-dim(Multiple.MCMC)[1]
+  m<-dim(Multiple.MCMC)[2]
+  W <- mean(apply(Multiple.MCMC, 2, var)) # within variance
+  B <-(n/(m-1))*sum((apply(Multiple.MCMC,2,mean)-mean(Multiple.MCMC))^2) #between variance
+  sigma2.hat <- ((n-1)/n)*W + (1/n)*B #signma square hat
+  G.Ratio.hat <- sqrt(sigma2.hat/W) #Gelman ratio
+  n.eff <- m*n*sigma2.hat/B #number of effective samples
+  Output <- data.frame(Within.V=W, 
+                          Between.V=B, 
+                          sigma2.hat=sigma2.hat, 
+                          Gelman.Ratio.hat=G.Ratio.hat,
+                          n.eff= n.eff )
+  Final.Output<- pander::pander(Output) #make the output as a table
+
+  return(Final.Output) #final results
+}
+
+
+#test of the function
+ouput <- matrix(ncol=100, nrow=1e3)
+set.seed(23)
+for(j in 1:100)
+ouput[,j] <- metropolis.sample.mcmc(target.pdf, proposed.f, xo=runif(1, -10, 10), n.steps=1e3)
+
+
+Gelman.Diagnostics(ouput)
+```
+
+
+# Question 5a.
+
+```{r}
+library(tidyverse)
+estimated.sample<-r.sample.cdf(qbeta(n,12,6),1000)
+
+estimated.output<-data.frame(Mean=mean(estimated.sample), Variance=var(estimated.sample), Median=median(estimated.sample))
+
+pander::pander(estimated.output)
+pander::pander(quantile(c(estimated.sample), probs=c(0.05, 0.10, 0.90, 0.95)))
+
+
+xx=seq(0, 1, length.out = 300)
+
+true.dist.df <- data.frame(x=xx, density=dbeta(xx, 12, 6))
+
+sampled <- data.frame(x=estimated.sample)
+
+ggplot(sampled) + geom_histogram(aes(x=x, y= ..density..), bins = 80, color="black") +
+geom_line(data=true.dist.df, aes(x=x, y=density), col='red', lwd=2)
+
+```
+
+
+# Question 5b.
+
+```{r}
+library(tidyverse)
+estimated.sample<-r.sample_accept(dbeta(b, 12, 6), 0, 1, 1000)
+
+estimated.output<-data.frame(Mean=mean(estimated.sample), Variance=var(estimated.sample), Median=median(estimated.sample))
+
+pander::pander(estimated.output)
+pander::pander(quantile(c(estimated.sample), probs=c(0.05, 0.10, 0.90, 0.95)))
+
+
+xx=seq(0, 1, length.out = 300)
+
+true.dist.df <- data.frame(x=xx, density=dbeta(xx, 12, 6))
+
+sampled <- data.frame(x=estimated.sample)
+
+ggplot(sampled) + geom_histogram(aes(x=x, y= ..density..), bins = 100, color="black") +
+geom_line(data=true.dist.df, aes(x=x, y=density), col='red', lwd=2)
+
+
+
+```
+
+
+# Question 5c.
+
+```{r}
+target.pdf<- function (x) {
+  dbeta(x, 12, 6)
+     } 
+
+proposed.f <- function(x){
+x + runif(length(x), -10, 10)
+}
+
+estimated.sample<-metropolis.sample.mcmc(target.pdf,proposed.f,xo=xo,n.steps=2000)
+
+estimated.output<-data.frame(Mean=mean(estimated.sample), Variance=var(estimated.sample), Median=median(estimated.sample))
+
+pander::pander(estimated.output)
+pander::pander(quantile(c(estimated.sample), probs=c(0.05, 0.10, 0.90, 0.95)))
+
+
+xx=seq(0, 1, length.out = 300)
+
+true.dist.df <- data.frame(x=xx, density=dbeta(xx, 12, 6))
+
+sampled <- data.frame(x=estimated.sample)
+
+ggplot(sampled) + geom_histogram(aes(x=x, y= ..density..), bins = 100, color="black") +
+geom_line(data=true.dist.df, aes(x=x, y=density), col='red', lwd=2)
+```
+
+
+
+# Question 6a.
+
+```{r}
+Rayleigh.dis <- function(x, sig=1) {
+  height.density  <- numeric()
+  
+height.density <- (x/(sig^2))*exp(-(x^2)/(2*sig^2))
+
+if( x >= 0){
+  height.density 
+}
+
+  
+  return( height.density)
+  
+}
+
+rm(x)
+Rayleigh.dis(x=1:4, 2)
+
+x=seq(0, 65)
+
+matplot(x, 
+        y=cbind(Rayleigh.dis(x, 2), Rayleigh.dis(x, 5), Rayleigh.dis(x, 15)), 
+        type = "l",
+        lty = 1,
+        col = c("red", "blue", "black"),
+        xlab = "values",
+        ylab = "densities",
+        main= "Rayleigh Distribution Curves")
+legend(x= "topright",
+       legend = paste(c("sigma=2", "sigma=5", "sigma=15")),
+       col = c("red", "blue", "black"),
+       lty = 1)
+
+ggplot(data.frame(x=c(0, 65)), aes(x=x))+ geom_line(col='red', lwd=2) + 
+  geom_line(Data5, aes(x=x, y=Height2),col='blue', lwd=2)
+
+curve(Rayleigh.dis(x, 3), from = 0, to=100)
+
+
+ggplot(data.frame(x=c(0, 65)), aes(x=x))+ stat_function(fun = Rayleigh.dis,args = list(x,0.04), aes(colour= "Group 1")) + 
+  stat_function(fun = Rayleigh.dis(x, 5), aes(colour= "Group 2"))
+
+
+library(extraDistr)
+drayleigh(2, 2)
+ 
+```
